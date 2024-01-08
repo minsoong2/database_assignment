@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>게시판</title>
+
+  <script>
+
+    // 현재 날짜로 설정
+    function setCurrentDate() {
+      var currentDate = new Date().toISOString().split('T')[0];
+      document.getElementById('date').value = currentDate;
+    }
+
+    // 게시글 상세 조회 영역을 닫기
+    function closePostDetail() {
+      const postDetail = document.getElementById('postDetail');
+      postDetail.style.display = 'none';
+      location.reload();
+    }
+
+  </script>
+</head>
+<body onload="setCurrentDate()">
+
+  <h2>게시글 단위 설정</h2>
+  <input type="number" id="postsPerPage" min="1" value="">
+  <button onclick="setPostsPerPage()">설정</button>
+
+  <script>
+    // 게시글 단위 설정 함수
+    function setPostsPerPage() {
+      const postsPerPage = document.getElementById('postsPerPage').value;
+      const urlParams = new URLSearchParams(window.location.search);
+      if (postsPerPage === '0' || !Number.isInteger(parseFloat(postsPerPage))) {
+        alert('게시물 단위는 0보다 큰 정수여야 합니다.');
+      }else {
+        urlParams.set('postsPerPage', postsPerPage);
+        window.location.href = `?${urlParams.toString()}`;
+      }
+    }
+  </script>
+
+
+  <h1>게시글 목록</h1>
+  
+  <div id="postList"></div>
+  <script>
+
+    // 게시글 삭제 함수
+    function deletePost(postId) {
+      fetch(`/post/${postId}`, {
+        method: 'DELETE'
+      })
+        .then(response => response.json())
+        .then(data => {
+          console.log(data.message);
+          const postElement = document.getElementById(`post_${postId}`);
+          if (postElement) {
+            postElement.remove();
+            location.reload();
+          }
+        })
+        .catch(error => {
+          console.error('게시글 삭제 실패:', error);
+        });
+    }
+
+    // 게시글 상세 조회 함수
+    function showPostDetail(postId) {
+      fetch(`/post/${postId}`)
+        .then(response => response.text())
+        .then(html => {
+          postDetail.innerHTML = html;
+        })
+        .catch(error => console.error(error));   
+    }
+
+    // 댓글 삭제 이벤트 핸들러
+    function handleDeleteComment(event) {
+      const commentId = event.target.dataset.commentId;
+      const commentElement = event.target.parentNode; // 댓글 요소의 부모 요소를 가져옴
+
+      deleteComment(commentId)
+        .then(deletedCommentId => {
+          console.log('댓글 삭제 성공:', deletedCommentId);
+          commentElement.remove();
+        })
+        .catch(error => console.error('댓글 삭제 실패:', error));
+    }
+
+    // 댓글 삭제 함수
+    function deleteComment(commentId) {
+      return fetch(`/comment/${commentId}`, {
+        method: 'DELETE'
+      })
+        .then(response => response.json())
+        .then(data => {
+          console.log(data.message);
+          
+          return commentId; // 삭제된 댓글의 ID를 반환
+        })
+        .catch(error => {
+          console.error('댓글 삭제 실패:', error);
+          throw error;
+        });
+    }
+
+  </script>
+  
+  <script>
+    // 게시글 목록 호춯
+    fetch('/submit_post')
+      .then(response => response.json())
+      .then(data => {
+        const postList = document.getElementById('postList');
+        const postDetail = document.getElementById('postDetail');
+        let html = '';
+
+        // 페이지 정보 가져오기
+        const urlParams = new URLSearchParams(window.location.search);
+        const postsPerPage = parseInt(urlParams.get('postsPerPage'));
+        const totalPages = Math.ceil(data.length / postsPerPage); // 총 페이지 수
+
+        let page = parseInt(urlParams.get('page'));
+        if (!page || page < 1 || page > totalPages) {
+          page = 1; // 기본값으로 첫 페이지 설정
+        }
+
+        if (!postsPerPage || isNaN(postsPerPage)) {
+          // 게시글 단위 설정이 되지 않았을 때 게시글 목록을 숨김
+          postList.style.display = 'none';
+          return;
+        }
+
+        // 페이지에 해당하는 게시글 제목 출력
+        const startIdx = (page - 1) * postsPerPage; // 페이지 시작 인덱스
+        const endIdx = startIdx + postsPerPage; // 페이지 마지막 인덱스
+        data.slice(startIdx, endIdx).forEach(post => {
+          const listItem = document.createElement('ui');
+          listItem.id = `post_${post.id}`;
+
+          const postInfo = document.createElement('div');
+          postInfo.classList.add('post-info');
+
+          // 게시글 제목
+          const titleElement = document.createElement('span');
+          titleElement.classList.add('post-title');
+          titleElement.innerText = `${post.title}  `;
+          titleElement.addEventListener('click', () => {
+            // 게시글 제목 클릭 시 게시글 상세 내용 표시
+            showPostDetail(post.id);
+          });
+          postInfo.appendChild(titleElement);
+
+          const deleteButton = document.createElement('button');
+          deleteButton.innerText = '삭제';
+          deleteButton.addEventListener('click', () => {
+            // 삭제 버튼 클릭 시 게시글 삭제 함수 호출
+            deletePost(post.id);
+          });
+          postInfo.appendChild(deleteButton);
+
+          // 게시글 고유번호
+          const postIdElement = document.createElement('span');
+          postIdElement.classList.add('post-id');
+          postIdElement.innerText = `\n게시글 고유 번호: ${post.id}, `;
+          postInfo.appendChild(postIdElement);
+
+          // 게시글 작성자
+          const authorElement = document.createElement('span');
+          authorElement.classList.add('post-author');
+          authorElement.innerText = `작성자: ${post.author}, `;
+          postInfo.appendChild(authorElement);
+
+          // 게시글 작성일자
+          const dateElement = document.createElement('span');
+          dateElement.classList.add('post-date');
+          const postDate = new Date(post.date);
+          const dateString = postDate.toLocaleDateString('ko-KR');
+          dateElement.innerText = `작성일자: ${dateString}`;
+          postInfo.appendChild(dateElement);
+          
+          listItem.appendChild(postInfo);
+          listItem.appendChild(document.createElement('br'));
+          postList.appendChild(listItem);
+        });
+
+        // 페이지 버튼 생성
+        if (totalPages > 1) {
+          const pageButtons = document.createElement('div');
+          for (let i = 1; i <= totalPages; i++) {
+            const button = document.createElement('button');
+            button.innerText = i;
+            if (i === page) {
+              button.disabled = true; // 현재 페이지 버튼 비활성화
+            } else {
+              button.addEventListener('click', () => {
+                urlParams.set('page', i);
+                window.location.href = `?${urlParams.toString()}`;
+              });
+            }
+            pageButtons.appendChild(button);
+          }
+          postList.appendChild(pageButtons);
+        }
+      })
+      .catch(error => console.error(error));
+  </script>
+  
+  <div id="postDetail"></div>
+  
+  <h1>게시글 작성</h1>
+  <form action="submit_post" method="POST">
+    <label for="author">작성자:</label>
+    <input type="text" id="author" name="author" required><br>
+
+    <label for="title">제목:</label>
+    <input type="text" id="title" name="title" required><br>
+
+    <label for="content">내용:</label><br>
+    <textarea id="content" name="content" rows="4" cols="50" required></textarea><br>
+
+    <span id="date"></span>
+
+    <input type="hidden" id="post_id" name="post_id"> <!-- 고유번호는 자동으로 할당되므로 hidden 필드로 처리 -->
+
+    <input type="submit" value="작성">
+  </form>
+  
+
+  <h2>댓글 작성</h2>
+  <form id="commentForm">
+    <label for="postTitle">게시글 제목:</label>
+    <select id="postTitle" name="postTitle" required>
+    </select>
+    <br>
+    <label for="commentAuthor">작성자:</label>
+    <input type="text" id="commentAuthor" name="commentAuthor" required>
+    <br>
+    <label for="commentContent">내용:</label><br>
+    <textarea id="commentContent" name="commentContent" required></textarea>
+    <br>
+    <button type="submit">댓글 작성</button>
+  </form>
+  
+
+  <script>
+    // 게시글 상세 조회 및 댓글 작성 폼 가져오기
+    const postDetail = document.getElementById('postDetail');
+    const commentForm = document.getElementById('commentForm');
+    const postTitleSelect = document.getElementById('postTitle');
+    const commentAuthorInput = document.getElementById('commentAuthor');
+    const commentContentInput = document.getElementById('commentContent');
+
+    // 댓글 작성 폼 초기화
+    function resetCommentForm() {
+      commentForm.reset();
+    }
+
+    // 댓글 작성 이벤트 핸들러
+    commentForm.addEventListener('submit', event => {
+      event.preventDefault();
+
+      // 선택된 게시글 제목과 작성자, 내용
+      const selectedPostTitle = postTitleSelect.value;
+      const commentAuthor = commentAuthorInput.value;
+      const commentContent = commentContentInput.value;
+
+      const allPTags = postDetail.querySelectorAll('p');
+
+      // 데이터베이스에 댓글 작성 요청
+      fetch('/submit_comment', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          postTitle: selectedPostTitle,
+          author: commentAuthor,
+          content: commentContent,
+          date: new Date().toISOString() 
+        })
+      })
+        .then(response => response.json())
+        .then(data => {
+          console.log('댓글 작성 성공:', data);
+          resetCommentForm();
+          const commentElement = document.createElement('div');
+          commentElement.classList.add('comment');
+
+          const commentContentElement = document.createElement('div');
+          commentContentElement.classList.add('comment-content');
+
+          const deleteButton = document.createElement('button');
+          deleteButton.classList.add('delete-button');
+          deleteButton.textContent = '삭제';
+          deleteButton.addEventListener('click', () => {
+            deleteComment(data.commentId);
+            commentElement.remove();
+          });
+
+          commentContentElement.innerHTML = `
+            <p>작성자: ${commentAuthor}</p>
+            <p>댓글 내용: ${commentContent}</p>
+            <p>작성일자: ${new Date().toLocaleDateString('ko-KR', {
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+            })}</p>
+          `;
+          
+          commentElement.appendChild(commentContentElement);
+          commentElement.appendChild(deleteButton);
+          console.log(postDetail);
+          console.log(postDetail.textContent);
+          console.log(allPTags[0].textContent);
+          console.log(allPTags[1].textContent);
+          console.log(selectedPostTitle);
+          console.log(commentAuthor);
+          if (allPTags[1].textContent === `제목: ${selectedPostTitle}`){
+            postDetail.appendChild(commentElement);
+          }
+        })
+        .catch(error => console.error('댓글 작성 실패:', error));
+        
+    });
+
+    // 댓글 작성의 게시글(제목) 목록 불러오기
+    fetch('/submit_post')
+      .then(response => response.json())
+      .then(posts => {
+        // 게시글 목록을 동적으로 선택 옵션으로 추가하기
+        posts.forEach(post => {
+          const option = document.createElement('option');
+          option.value = post.title;
+          option.textContent = post.title;
+          postTitleSelect.appendChild(option);
+        });
+
+        // 첫 번째 게시글 상세 조회
+        if (posts.length > 0) {
+          const firstPostId = posts[0].id;
+        }
+      })
+      .catch(error => console.error(error));
+  </script>
+
+</body>
+</html>

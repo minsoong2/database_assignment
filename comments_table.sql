@@ -1,0 +1,8 @@
+CREATE TABLE comments (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  postId INT NOT NULL,
+  author VARCHAR(255) NOT NULL,
+  content TEXT NOT NULL,
+  date DATETIME NOT NULL,
+  FOREIGN KEY (postId) REFERENCES posts(id)
+);
