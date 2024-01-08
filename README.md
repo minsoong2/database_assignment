@@ -41,7 +41,7 @@ This project involves building a web-based bulletin board application. It featur
 - Share the repository with dojinchoi@changwon.ac.kr for review and bonus points.
 - Ensure to push commits periodically to demonstrate development progress.
 
-## S🚀ubmission
+## 🚀Submission
 
 - Compress the entire project into a single file and submit it on eCampus.
 - Include a `Readme.md` file with detailed instructions on setting up and running the application.
